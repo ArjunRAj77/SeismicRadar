@@ -46,10 +46,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 2. State & DOM Elements
     const USGS_URL = 'https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_day.geojson';
+    const PLATES_URL = 'https://raw.githubusercontent.com/fraxen/tectonicplates/master/GeoJSON/PB2002_boundaries.json';
+    
     const quakeListEl = document.getElementById('quake-list');
     const quakeCountEl = document.getElementById('quake-count');
     const magFilterEl = document.getElementById('mag-filter');
     const searchFilterEl = document.getElementById('search-filter');
+    const platesToggleEl = document.getElementById('plates-toggle');
     
     // Modal Elements
     const infoBtn = document.getElementById('info-btn');
@@ -58,6 +61,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const closeModalBtn = document.getElementById('close-modal-btn');
     
     let markersLayer = L.layerGroup().addTo(map);
+    let platesLayer = L.layerGroup().addTo(map);
     let currentFeatures = [];
 
     // 3. Helper Functions
@@ -196,11 +200,42 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
+    const fetchTectonicPlates = async () => {
+        try {
+            const response = await fetch(PLATES_URL);
+            if (!response.ok) throw new Error('Failed to fetch tectonic plates data');
+            
+            const data = await response.json();
+            
+            L.geoJSON(data, {
+                style: {
+                    color: '#06b6d4', // Tailwind cyan-500
+                    weight: 1.5,
+                    opacity: 0.5,
+                    dashArray: '5, 5' // Dashed line for a radar/overlay feel
+                }
+            }).addTo(platesLayer);
+        } catch (error) {
+            console.error("Error fetching tectonic plates:", error);
+        }
+    };
+
     // 5. Event Listeners for Filters
     magFilterEl.addEventListener('change', renderEarthquakes);
     searchFilterEl.addEventListener('input', renderEarthquakes);
+    
+    if (platesToggleEl) {
+        platesToggleEl.addEventListener('change', (e) => {
+            if (e.target.checked) {
+                map.addLayer(platesLayer);
+            } else {
+                map.removeLayer(platesLayer);
+            }
+        });
+    }
 
     // 6. Lifecycle
+    fetchTectonicPlates();
     fetchEarthquakes();
     setInterval(fetchEarthquakes, 60000); // 1-minute auto-refresh
 });
