@@ -22,6 +22,29 @@
         /* Modal Animation */
         .modal-enter { opacity: 0; transform: scale(0.95); }
         .modal-enter-active { opacity: 1; transform: scale(1); transition: opacity 200ms ease-out, transform 200ms ease-out; }
+
+        /* Dark Mode Leaflet Popup Overrides */
+        .leaflet-popup-content-wrapper {
+            background-color: #1f2937; /* Tailwind gray-800 */
+            color: #f3f4f6; /* Tailwind gray-100 */
+            border: 1px solid #374151; /* Tailwind gray-700 */
+            border-radius: 0.75rem;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5);
+            padding: 4px;
+        }
+        .leaflet-popup-tip {
+            background-color: #1f2937;
+            border-top: 1px solid #374151;
+            border-left: 1px solid #374151;
+        }
+        .leaflet-container a.leaflet-popup-close-button {
+            color: #9ca3af; /* Tailwind gray-400 */
+            padding: 8px 8px 0 0;
+        }
+        .leaflet-container a.leaflet-popup-close-button:hover {
+            color: #f3f4f6;
+            background: transparent;
+        }
     </style>
 </head>
 <body class="bg-gray-900 text-white h-screen flex flex-col md:flex-row overflow-hidden font-sans">

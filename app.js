@@ -7,7 +7,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // 1. Initialize Map
     const mapEl = document.getElementById('map');
 
-    // Enable fractional zooming (zoomSnap: 0) to allow the map to perfectly scale to any pixel width
     const map = L.map('map', {
         zoomControl: false,
         zoomSnap: 0,
@@ -21,34 +20,25 @@ document.addEventListener('DOMContentLoaded', () => {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
         subdomains: 'abcd',
         maxZoom: 10,
-        noWrap: true // Prevent horizontal duplication
+        noWrap: true
     }).addTo(map);
 
-    // Custom function to act like "object-fit: cover" for the map tiles
     const fitMapToScreen = () => {
         const width = mapEl.offsetWidth;
         const height = mapEl.offsetHeight;
         
-        // Leaflet's base world size is 256x256 pixels at zoom level 0.
-        // We calculate the exact fractional zoom needed to fill the screen width/height.
         const zoomX = Math.log2(width / 256);
         const zoomY = Math.log2(height / 256);
-        
-        // Use Math.max to ensure the map covers the entire container without any black borders
         const requiredZoom = Math.max(zoomX, zoomY);
 
-        map.setMinZoom(0); // Temporarily unlock min zoom
+        map.setMinZoom(0);
         map.setView([20, 0], requiredZoom);
-        map.setMinZoom(requiredZoom); // Lock it so user can't zoom out into the void
-        
-        // Constrain panning to the actual world map coordinates
+        map.setMinZoom(requiredZoom);
         map.setMaxBounds([[-90, -180], [90, 180]]);
     };
 
-    // Initial fit
     fitMapToScreen();
 
-    // Recalculate perfectly if the browser window is resized
     window.addEventListener('resize', () => {
         map.invalidateSize();
         fitMapToScreen();
@@ -141,9 +131,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const mag = props.mag !== null ? props.mag.toFixed(1) : 'N/A';
             const color = getColor(props.mag);
             const isHighMag = props.mag >= 5.0;
+            const radius = getRadius(props.mag);
 
             const marker = L.circleMarker([lat, lng], {
-                radius: getRadius(props.mag),
+                radius: radius,
                 fillColor: color,
                 color: color,
                 weight: isHighMag ? 2 : 1,
@@ -151,13 +142,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 fillOpacity: isHighMag ? 0.6 : 0.4
             });
 
+            // Offset the popup dynamically based on the radius of the circle
+            // so it hovers perfectly right above the circle marker instead of covering it.
             marker.bindPopup(`
-                <div class="font-sans text-gray-800">
-                    <strong class="block text-lg mb-1">Magnitude ${mag}</strong>
+                <div class="font-sans text-gray-100">
+                    <strong class="block text-lg mb-1" style="color: ${color}">Magnitude ${mag}</strong>
                     <span class="block text-sm mb-2">${props.place}</span>
-                    <span class="text-xs text-gray-500">${new Date(props.time).toLocaleString()}</span>
+                    <span class="text-xs text-gray-400">${new Date(props.time).toLocaleString()}</span>
                 </div>
-            `);
+            `, {
+                offset: [0, -radius] // Dynamic offset
+            });
 
             markersLayer.addLayer(marker);
 
