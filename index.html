@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SeismicRadar | Global Earthquake Monitor</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    
+    <style>
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #1f2937; }
+        ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #6b7280; }
+        
+        #map { height: 100%; width: 100%; background-color: #000; }
+        
+        /* Modal Animation */
+        .modal-enter { opacity: 0; transform: scale(0.95); }
+        .modal-enter-active { opacity: 1; transform: scale(1); transition: opacity 200ms ease-out, transform 200ms ease-out; }
+    </style>
+</head>
+<body class="bg-gray-900 text-white h-screen flex flex-col md:flex-row overflow-hidden font-sans">
+
+    <!-- Sidebar / Feed -->
+    <aside class="w-full md:w-1/3 lg:w-1/4 bg-gray-900 border-r border-gray-800 flex flex-col h-1/3 md:h-full z-10 shadow-2xl relative">
+        <div class="p-5 pb-4 flex-shrink-0 border-b border-gray-800 bg-gray-900 z-20">
+            <div class="flex justify-between items-start mb-1">
+                <h1 class="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-orange-400 flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                    SeismicRadar
+                </h1>
+                
+                <!-- Info Button -->
+                <button id="info-btn" class="text-gray-400 hover:text-white transition-colors" title="About SeismicRadar">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </button>
+            </div>
+            <p class="text-xs text-gray-400 uppercase tracking-wider font-semibold mb-4">Real-time USGS Feed</p>
+            
+            <!-- Filters -->
+            <div class="space-y-3 mb-4">
+                <div>
+                    <label for="mag-filter" class="block text-xs text-gray-500 uppercase tracking-wider mb-1">Min Magnitude</label>
+                    <select id="mag-filter" class="w-full bg-gray-800 text-white text-sm rounded border border-gray-700 p-2 focus:outline-none focus:border-red-500 transition-colors cursor-pointer">
+                        <option value="0">All Earthquakes</option>
+                        <option value="2.5">2.5+ (Felt)</option>
+                        <option value="4.0">4.0+ (Moderate)</option>
+                        <option value="5.0">5.0+ (Significant)</option>
+                        <option value="6.0">6.0+ (Major)</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="search-filter" class="block text-xs text-gray-500 uppercase tracking-wider mb-1">Location Search</label>
+                    <input type="text" id="search-filter" placeholder="e.g. Japan, California..." class="w-full bg-gray-800 text-white text-sm rounded border border-gray-700 p-2 focus:outline-none focus:border-red-500 transition-colors placeholder-gray-500">
+                </div>
+            </div>
+
+            <div class="flex justify-between items-center text-sm text-gray-300">
+                <span>Last 24 Hours</span>
+                <span id="quake-count" class="bg-gray-800 px-2 py-1 rounded text-xs font-mono text-gray-400">Loading...</span>
+            </div>
+        </div>
+
+        <div id="quake-list" class="flex-1 overflow-y-auto p-3 space-y-2 pb-20 md:pb-3">
+            <div class="animate-pulse flex space-x-4 p-3 bg-gray-800 rounded">
+                <div class="rounded-full bg-gray-700 h-10 w-10"></div>
+                <div class="flex-1 space-y-2 py-1">
+                    <div class="h-3 bg-gray-700 rounded w-3/4"></div>
+                    <div class="h-3 bg-gray-700 rounded w-1/2"></div>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Map Container -->
+    <main class="w-full md:w-2/3 lg:w-3/4 h-2/3 md:h-full relative z-0">
+        <div id="map"></div>
+        
+        <!-- Map Legend -->
+        <div class="absolute bottom-6 right-6 bg-gray-900/90 backdrop-blur border border-gray-700 p-3 rounded-lg shadow-xl z-[400] text-xs pointer-events-none">
+            <h4 class="font-bold mb-2 text-gray-300 uppercase tracking-wide">Magnitude</h4>
+            <div class="flex items-center gap-2 mb-1">
+                <span class="w-3 h-3 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.8)]"></span>
+                <span>5.0+ (Significant)</span>
+            </div>
+            <div class="flex items-center gap-2 mb-1">
+                <span class="w-3 h-3 rounded-full bg-orange-500 shadow-[0_0_5px_rgba(249,115,22,0.6)]"></span>
+                <span>3.0 - 4.9 (Moderate)</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <span class="w-3 h-3 rounded-full bg-yellow-400 opacity-70"></span>
+                <span>< 3.0 (Minor)</span>
+            </div>
+        </div>
+    </main>
+
+    <!-- Info Modal Overlay -->
+    <div id="info-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-[1000] hidden flex items-center justify-center p-4">
+        <div class="bg-gray-900 border border-gray-700 rounded-xl max-w-lg w-full shadow-2xl overflow-hidden transform scale-95 opacity-0 transition-all duration-200" id="modal-content">
+            <div class="p-5 border-b border-gray-800 flex justify-between items-center bg-gray-800/50">
+                <h2 class="text-xl font-bold text-white flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    About SeismicRadar
+                </h2>
+                <button id="close-modal-btn" class="text-gray-400 hover:text-white">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            <div class="p-6 space-y-4 text-sm text-gray-300 leading-relaxed">
+                <p>
+                    <strong>SeismicRadar</strong> is a real-time global dashboard monitoring the earth's tectonic activity. It provides a visual, interactive map of seismic events over the past 24 hours.
+                </p>
+                <div class="bg-gray-800 p-4 rounded-lg border border-gray-700">
+                    <h3 class="font-bold text-white mb-2 uppercase text-xs tracking-wider">📡 Data Source</h3>
+                    <p class="mb-2">
+                        All data is pulled directly and automatically from the <strong>United States Geological Survey (USGS)</strong>. 
+                    </p>
+                    <p class="text-xs text-gray-400">
+                        The dashboard connects to the official USGS GeoJSON live feed, polling for new data every 60 seconds to ensure you are seeing the most accurate, up-to-the-minute reports available.
+                    </p>
+                </div>
+                <div>
+                    <h3 class="font-bold text-white mb-1 uppercase text-xs tracking-wider">🗺️ How It Works</h3>
+                    <ul class="list-disc list-inside space-y-1 text-gray-400">
+                        <li><strong>Click any event</strong> in the sidebar to instantly fly the map to the earthquake's epicenter.</li>
+                        <li><strong>Filter events</strong> by minimum magnitude or search for specific regions (e.g., "California", "Japan").</li>
+                        <li>Circle size and color correspond to the severity (Magnitude) of the earthquake.</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="p-4 bg-gray-800 border-t border-gray-700 text-center">
+                <a href="https://earthquake.usgs.gov/" target="_blank" class="text-xs text-blue-400 hover:text-blue-300 transition-colors">
+                    Visit Official USGS Website →
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    
+    <!-- Application Logic -->
+    <script src="app.js"></script>
+</body>
+</html>
