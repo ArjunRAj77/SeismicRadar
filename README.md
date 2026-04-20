@@ -4,6 +4,8 @@
 
 Designed as a stateless Single Page Application (SPA), it requires zero backend infrastructure, ensuring high reliability and edge-deployment capability.
 
+<img width="1913" height="937" alt="image" src="https://github.com/user-attachments/assets/4584c4c2-1417-41bd-a0ae-c5646e9d2c5e" />
+
 ## 🏗️ Architecture & Tech Stack
 
 *   **Architecture:** Stateless SPA
