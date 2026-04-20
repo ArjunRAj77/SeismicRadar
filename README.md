@@ -9,21 +9,25 @@ Designed as a stateless Single Page Application (SPA), it requires zero backend 
 ## 🏗️ Architecture & Tech Stack
 
 *   **Architecture:** Stateless SPA
-*   **Data Source:** [USGS GeoJSON Feed](https://earthquake.usgs.gov/earthquakes/feed/v1.0/geojson.php) (`all_day.geojson`)
+*   **Data Source 1:** [USGS GeoJSON Feed](https://earthquake.usgs.gov/earthquakes/feed/v1.0/geojson.php) (`all_day.geojson`)
+*   **Data Source 2:** [Fraxen Tectonic Plates](https://github.com/fraxen/tectonicplates) (`PB2002_boundaries.json`)
 *   **Mapping Engine:** Leaflet.js
 *   **Tile Provider:** CartoDB (Dark Matter theme)
 *   **Styling:** Tailwind CSS (CDN injection for rapid deployment)
 *   **Application Logic:** Vanilla ES6 JavaScript
+*   **Hosting:** Vercel Ready (`vercel.json` included for optimal SPA routing and Edge Caching)
 
 ## 🚀 Features
 
 *   **Real-Time Data:** Automatically polls the USGS API every 60 seconds.
+*   **🗺️ Tectonic Plate Overlay:** Visualize geological fault lines using open-source PB2002 GeoJSON data. Toggleable via the UI to show exactly how earthquakes align with the earth's plates.
+*   **🎛️ Real-Time Filtering:** Instantly filter earthquakes by Minimum Magnitude (e.g., 5.0+ Significant) or by Location (e.g., "Japan", "California").
 *   **Interactive Cartography:** Fly-to navigation upon clicking events in the feed.
 *   **Severity Color-Coding:** 
     *   🔴 **Red:** Magnitude 5.0+ (Significant)
     *   🟠 **Orange:** Magnitude 3.0 - 4.9 (Moderate)
     *   🟡 **Yellow:** Magnitude < 3.0 (Minor)
-*   **Responsive Design:** Fully fluid layout that splits into a bottom-sheet feed on mobile and a side-panel feed on desktop.
+*   **Responsive Design:** Fully fluid layout that splits into a bottom-sheet feed on mobile and a side-panel feed on desktop. Maps scale dynamically without letterboxing or tiling duplication.
 *   **Time Normalization:** Translates absolute Unix timestamps into human-readable relative time (e.g., "15 minutes ago").
 
 ## 💻 Installation & Usage
