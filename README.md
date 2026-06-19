@@ -1,10 +1,6 @@
 # SeismicRadar 🌍
 
-<<<<<<< HEAD
-**SeismicRadar** is a real-time, global earthquake monitoring dashboard. It visualizes seismic activity across the globe by pulling live data directly from the United States Geological Survey (USGS), rendered on an interactive map with a glassmorphism control console.
-=======
 **SeismicRadar**  is a real-time, global earthquake monitoring dashboard. It visualizes seismic activity across the globe by pulling live data directly from the United States Geological Survey (USGS).
->>>>>>> 680010f787857ae9917fac022f525d9ff2724e31
 
 Designed as a stateless Single Page Application (SPA), it requires zero backend infrastructure, no build step, and no package manager — ensuring high reliability and edge-deployment capability.
 
