@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#070b10">
+    <meta name="description" content="SeismicRadar 7-Day Dashboard - weekly global earthquake density and analytics from the USGS feed.">
+    <title>SeismicRadar | 7-Day Dashboard</title>
+
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <link rel="apple-touch-icon" href="favicon.svg">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+
+    <style>
+        html, body { height: 100%; }
+        body { -webkit-tap-highlight-color: transparent; }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.18); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.3); }
+
+        #heatmap { width: 100%; height: 100%; background-color: #070b10; }
+        .map-grid {
+            position: absolute; inset: 0; z-index: 390; pointer-events: none;
+            background:
+                linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px) 0 0 / 46px 46px,
+                linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px) 0 0 / 46px 46px,
+                radial-gradient(circle at 50% 48%, transparent 60%, rgba(0,0,0,0.5) 100%);
+        }
+
+        .glass { background: linear-gradient(160deg, rgba(22,30,43,0.66), rgba(10,15,22,0.52)); backdrop-filter: blur(18px) saturate(140%); -webkit-backdrop-filter: blur(18px) saturate(140%); border: 0.5px solid rgba(255,255,255,0.14); box-shadow: 0 10px 40px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.12); }
+        .glass-sm { background: rgba(255,255,255,0.07); backdrop-filter: blur(14px) saturate(140%); -webkit-backdrop-filter: blur(14px) saturate(140%); border: 0.5px solid rgba(255,255,255,0.16); }
+        .glass-inset { background: rgba(255,255,255,0.06); border: 0.5px solid rgba(255,255,255,0.08); }
+
+        .card { background: #11161f; border-radius: 10px; }
+
+        .chip { font-size: 11px; padding: 5px 10px; border-radius: 14px; cursor: pointer; border: 0.5px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.04); color: #9aa4b2; transition: all 0.15s; user-select: none; display: inline-flex; align-items: center; gap: 5px; }
+        .chip:hover { background: rgba(255,255,255,0.09); }
+        .chip.on-sig { background: rgba(239,68,68,0.14); border-color: rgba(239,68,68,0.4); color: #fca5a5; }
+        .chip.on-tsu { background: rgba(34,211,238,0.12); border-color: rgba(34,211,238,0.4); color: #7dd3fc; }
+        .chip.on-felt { background: rgba(34,197,94,0.12); border-color: rgba(34,197,94,0.4); color: #86efac; }
+        .chip.on-type { background: rgba(251,146,60,0.14); border-color: rgba(251,146,60,0.4); color: #fdba74; }
+
+        .day-chip { flex: 1; text-align: center; font-size: 10px; padding: 6px 0; border-radius: 6px; cursor: pointer; color: #5f6b7a; background: rgba(255,255,255,0.03); border: 0.5px solid transparent; transition: all 0.15s; user-select: none; }
+        .day-chip.active { color: #0a0e14; background: #22d3ee; font-weight: 600; }
+
+        .alert-dot { width: 10px; height: 10px; border-radius: 50%; cursor: pointer; border: 1.5px solid transparent; transition: transform 0.12s; }
+        .alert-dot:hover { transform: scale(1.2); }
+        .alert-dot.active { border-color: #fff; }
+
+        /* Dual range slider */
+        .dual { position: relative; height: 18px; }
+        .dual .track { position: absolute; top: 7px; left: 0; right: 0; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.14); }
+        .dual .fill { position: absolute; top: 7px; height: 4px; border-radius: 2px; background: #fb923c; }
+        .dual input[type=range] { position: absolute; top: 0; left: 0; width: 100%; height: 18px; margin: 0; background: none; pointer-events: none; -webkit-appearance: none; appearance: none; }
+        .dual input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; pointer-events: auto; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,0.6); cursor: pointer; }
+        .dual input[type=range]::-moz-range-thumb { pointer-events: auto; width: 16px; height: 16px; border: none; border-radius: 50%; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,0.6); cursor: pointer; }
+
+        select, input[type=text] { color: #e5e7eb; }
+        select option { background: #11161f; color: #e5e7eb; }
+
+        .tl-day { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; gap: 1px; height: 100%; cursor: default; }
+        .tl-seg { border-radius: 2px 2px 0 0; transition: height 0.4s ease; }
+
+        .hist { display: flex; align-items: flex-end; gap: 3px; height: 44px; }
+        .hist .bar { flex: 1; border-radius: 2px 2px 0 0; min-height: 2px; transition: height 0.4s ease; }
+
+        .big-row { display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 4px; border-radius: 7px; transition: background 0.15s; }
+        .big-row:hover { background: rgba(255,255,255,0.06); }
+
+        .leaflet-popup-content-wrapper { background: rgba(17,22,31,0.92); color: #f3f4f6; border: 0.5px solid rgba(255,255,255,0.16); border-radius: 12px; backdrop-filter: blur(10px); }
+        .leaflet-popup-tip { background: rgba(17,22,31,0.92); }
+        .leaflet-control-zoom a { background: rgba(17,22,31,0.82) !important; color: #cbd5e1 !important; border: 0.5px solid rgba(255,255,255,0.14) !important; }
+        .leaflet-control-attribution { background: rgba(7,11,16,0.6) !important; color: #6b7686 !important; }
+        .leaflet-control-attribution a { color: #8b95a5 !important; }
+
+        @media (max-width: 860px) {
+            #layout { flex-direction: column; }
+            #map-pane { height: 46vh; flex: none; }
+            #review { width: auto; max-height: none; }
+        }
+    </style>
+</head>
+<body class="bg-[#070b10] text-white font-sans h-screen flex flex-col overflow-hidden">
+
+    <header class="glass flex items-center justify-between px-4 py-2.5 flex-shrink-0 z-[600]">
+        <div class="flex items-center gap-3">
+            <a href="index.html" class="glass-sm flex items-center gap-1.5 text-[11px] text-gray-300 hover:text-white px-2.5 py-1.5 rounded-lg transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+                Back to live radar
+            </a>
+            <span class="flex items-center gap-2 text-base font-semibold">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="#fb923c"><path d="M13 2 4 14h6l-1 8 9-12h-6z"/></svg>
+                7-Day Seismic Overview
+            </span>
+        </div>
+        <div class="flex items-center gap-3">
+            <span class="text-[11px] text-gray-400 tabular-nums"><span id="count-total">-</span> events &middot; showing <span id="count-filtered" class="text-gray-200">-</span></span>
+            <span class="hidden sm:flex items-center gap-1.5 text-[11px] text-gray-400"><span class="w-1.5 h-1.5 rounded-full bg-green-500"></span><span id="updated">loading...</span></span>
+            <button id="refresh-btn" class="text-gray-300 hover:text-white transition-colors" title="Refresh" aria-label="Refresh">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+            </button>
+        </div>
+    </header>
+
+    <section class="glass-sm flex-shrink-0 px-4 py-3 z-[500] flex flex-col gap-3" style="border-radius:0;">
+        <div class="flex flex-wrap gap-x-6 gap-y-3 items-end">
+            <div style="min-width:190px;">
+                <div class="flex justify-between text-[9px] text-gray-400 uppercase tracking-wide"><span>Magnitude</span><span id="mag-label" class="text-orange-400 tabular-nums">all</span></div>
+                <div class="dual mt-2" id="mag-dual">
+                    <div class="track"></div>
+                    <div class="fill" id="mag-fill"></div>
+                    <input type="range" id="mag-min" min="0" max="10" step="0.1" value="0">
+                    <input type="range" id="mag-max" min="0" max="10" step="0.1" value="10">
+                </div>
+            </div>
+            <div style="min-width:150px;">
+                <div class="text-[9px] text-gray-400 uppercase tracking-wide mb-1.5">Region</div>
+                <select id="region-select" class="glass-inset rounded-lg text-xs px-2 py-2 w-full focus:outline-none cursor-pointer">
+                    <option value="">All regions</option>
+                </select>
+            </div>
+            <div class="flex-1" style="min-width:150px;">
+                <div class="text-[9px] text-gray-400 uppercase tracking-wide mb-1.5">Search location</div>
+                <div class="glass-inset rounded-lg px-2.5 py-2 flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z"/></svg>
+                    <input id="search" type="text" placeholder="e.g. Japan, Chile..." class="bg-transparent text-xs w-full focus:outline-none placeholder-gray-500">
+                </div>
+            </div>
+        </div>
+
+        <div class="flex flex-wrap gap-x-6 gap-y-3 items-center">
+            <div class="flex-1" style="min-width:230px;">
+                <div class="text-[9px] text-gray-400 uppercase tracking-wide mb-1.5">Days included</div>
+                <div id="days" class="flex gap-1.5"></div>
+            </div>
+            <div>
+                <div class="text-[9px] text-gray-400 uppercase tracking-wide mb-1.5">Impact alert</div>
+                <div id="alerts" class="flex items-center gap-2.5 h-[26px]"></div>
+            </div>
+            <div class="flex items-center gap-2 flex-wrap">
+                <span id="toggle-sig" class="chip"><svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M5 19h14a2 2 0 001.84-2.75L13.74 4a2 2 0 00-3.5 0L3.18 16.25A2 2 0 005 19z"/></svg>Significant</span>
+                <span id="toggle-tsu" class="chip"><svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12c2-3 4-3 6 0s4 3 6 0 4-3 6 0"/></svg>Tsunami</span>
+                <span id="toggle-felt" class="chip"><svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>Felt</span>
+                <span id="toggle-type" class="chip on-type"><svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h4l2 6 3-12 2 6h3"/></svg>Quakes only</span>
+                <span id="reset-btn" class="chip"><svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>Reset</span>
+            </div>
+        </div>
+    </section>
+
+    <div id="layout" class="flex flex-1 min-h-0">
+        <div id="map-pane" class="relative flex-1 min-w-0">
+            <div id="heatmap"></div>
+            <div class="map-grid"></div>
+            <div class="glass-sm absolute bottom-3 left-3 z-[450] rounded-xl px-3 py-2.5 pointer-events-none">
+                <div class="text-[9px] text-gray-400 uppercase tracking-wider mb-1.5">Activity intensity</div>
+                <div style="width:150px; height:8px; border-radius:4px; background:linear-gradient(90deg,#22d3ee,#facc15,#f97316,#ef4444);"></div>
+                <div class="flex justify-between text-[9px] text-gray-500 mt-1"><span>low</span><span>high</span></div>
+                <div class="flex items-center gap-1.5 mt-2 text-[9px] text-gray-300"><span style="width:9px;height:9px;border-radius:50%;background:#ef4444;border:1.5px solid rgba(255,255,255,0.4);"></span> M5.0+ event</div>
+            </div>
+        </div>
+
+        <aside id="review" class="glass-sm overflow-y-auto p-3 flex flex-col gap-2.5" style="width:380px; border-radius:0;">
+            <div class="grid grid-cols-2 gap-2">
+                <div class="card p-2.5"><div class="text-[9px] text-gray-400 uppercase tracking-wide">Total shown</div><div id="kpi-total" class="text-lg font-semibold tabular-nums">-</div></div>
+                <div class="card p-2.5"><div class="text-[9px] text-gray-400 uppercase tracking-wide">Largest</div><div id="kpi-largest" class="text-lg font-semibold tabular-nums">-</div></div>
+                <div class="card p-2.5"><div class="text-[9px] text-gray-400 uppercase tracking-wide">M4.5+</div><div id="kpi-major" class="text-lg font-semibold tabular-nums">-</div></div>
+                <div class="card p-2.5"><div class="text-[9px] text-gray-400 uppercase tracking-wide">Avg / day</div><div id="kpi-avg" class="text-lg font-semibold tabular-nums">-</div></div>
+            </div>
+
+            <div class="card p-3">
+                <div class="text-[10px] text-gray-400 uppercase tracking-wide mb-2.5">Events per day</div>
+                <div id="timeline" class="flex items-end gap-1.5" style="height:64px;"></div>
+                <div id="timeline-labels" class="flex justify-between text-[8px] text-gray-500 mt-1.5"></div>
+            </div>
+
+            <div class="card p-3">
+                <div class="text-[10px] text-gray-400 uppercase tracking-wide mb-2.5">Magnitude distribution</div>
+                <div id="histogram" class="hist"></div>
+                <div class="flex justify-between text-[8px] text-gray-500 mt-1"><span>0</span><span>2</span><span>4</span><span>6</span><span>7+</span></div>
+            </div>
+
+            <div class="card p-3">
+                <div class="text-[10px] text-gray-400 uppercase tracking-wide mb-2">Biggest events</div>
+                <div id="biggest" class="flex flex-col gap-1"></div>
+            </div>
+
+            <div class="card p-3">
+                <div class="text-[10px] text-gray-400 uppercase tracking-wide mb-2">Most active regions</div>
+                <div id="regions" class="flex flex-col gap-1.5"></div>
+            </div>
+        </aside>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.heat/0.2.0/leaflet-heat.js"></script>
+    <script src="week.js"></script>
+</body>
+</html>
