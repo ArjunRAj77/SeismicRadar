@@ -2,189 +2,288 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
+    <meta name="theme-color" content="#070b10">
+    <meta name="description" content="SeismicRadar - real-time global earthquake monitoring dashboard powered by the USGS live feed.">
     <title>SeismicRadar | Global Earthquake Monitor</title>
-    
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- Leaflet CSS -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
-    
-    <style>
-        ::-webkit-scrollbar { width: 8px; }
-        ::-webkit-scrollbar-track { background: #1f2937; }
-        ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #6b7280; }
-        
-        #map { height: 100%; width: 100%; background-color: #000; }
-        
-        /* Modal Animation */
-        .modal-enter { opacity: 0; transform: scale(0.95); }
-        .modal-enter-active { opacity: 1; transform: scale(1); transition: opacity 200ms ease-out, transform 200ms ease-out; }
 
-        /* Dark Mode Leaflet Popup Overrides */
-        .leaflet-popup-content-wrapper {
-            background-color: #1f2937; /* Tailwind gray-800 */
-            color: #f3f4f6; /* Tailwind gray-100 */
-            border: 1px solid #374151; /* Tailwind gray-700 */
-            border-radius: 0.75rem;
-            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5);
-            padding: 4px;
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <link rel="apple-touch-icon" href="favicon.svg">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+
+    <style>
+        :root { --sheet-h: 60vh; }
+        html, body { height: 100%; }
+        body { -webkit-tap-highlight-color: transparent; }
+
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.18); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.3); }
+
+        #map { position: absolute; inset: 0; height: 100%; width: 100%; background-color: #070b10; z-index: 0; }
+        .map-overlay {
+            position: absolute; inset: 0; z-index: 390; pointer-events: none;
+            background:
+                linear-gradient(rgba(255,255,255,0.022) 1px, transparent 1px) 0 0 / 48px 48px,
+                linear-gradient(90deg, rgba(255,255,255,0.022) 1px, transparent 1px) 0 0 / 48px 48px,
+                radial-gradient(circle at 50% 48%, transparent 55%, rgba(0,0,0,0.55) 100%);
         }
-        .leaflet-popup-tip {
-            background-color: #1f2937;
-            border-top: 1px solid #374151;
-            border-left: 1px solid #374151;
+
+        .glass {
+            background: linear-gradient(160deg, rgba(22,30,43,0.66), rgba(10,15,22,0.52));
+            backdrop-filter: blur(18px) saturate(140%); -webkit-backdrop-filter: blur(18px) saturate(140%);
+            border: 0.5px solid rgba(255,255,255,0.14);
+            box-shadow: 0 10px 40px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.12);
         }
-        .leaflet-container a.leaflet-popup-close-button {
-            color: #9ca3af; /* Tailwind gray-400 */
-            padding: 8px 8px 0 0;
+        .glass-sm {
+            background: rgba(255,255,255,0.07);
+            backdrop-filter: blur(14px) saturate(140%); -webkit-backdrop-filter: blur(14px) saturate(140%);
+            border: 0.5px solid rgba(255,255,255,0.16); box-shadow: inset 0 1px 0 rgba(255,255,255,0.12);
         }
-        .leaflet-container a.leaflet-popup-close-button:hover {
-            color: #f3f4f6;
-            background: transparent;
+        .glass-inset { background: rgba(255,255,255,0.06); border: 0.5px solid rgba(255,255,255,0.08); }
+
+        #sidebar {
+            position: absolute; top: 1rem; left: 1rem;
+            width: 360px; max-width: calc(100vw - 2rem); max-height: calc(100% - 2rem);
+            display: flex; flex-direction: column; border-radius: 18px; overflow: hidden; z-index: 500;
+            transition: transform 0.32s cubic-bezier(0.22,1,0.36,1);
         }
+        #sidebar-handle { display: none; }
+
+        @media (max-width: 768px) {
+            #sidebar {
+                top: auto; left: 0; right: 0; bottom: 0; width: auto; max-width: none;
+                max-height: var(--sheet-h); border-radius: 20px 20px 0 0;
+            }
+            #sidebar.collapsed { transform: translateY(calc(var(--sheet-h) - 132px)); }
+            #sidebar-handle { display: flex; align-items: center; justify-content: center; padding: 8px 0 4px; cursor: pointer; flex-shrink: 0; }
+            #sidebar-handle span { width: 40px; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.3); }
+            #legend { display: none; }
+            #status-pill .label-full { display: none; }
+        }
+
+        .mag-badge {
+            flex-shrink: 0; width: 38px; height: 38px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums;
+        }
+
+        #histogram { display: flex; align-items: flex-end; gap: 3px; height: 38px; }
+        #histogram .bar { flex: 1; border-radius: 2px 2px 0 0; min-height: 2px; transition: height 0.4s ease; }
+
+        .quake-card {
+            display: flex; align-items: center; gap: 10px; padding: 9px; border-radius: 11px; cursor: pointer;
+            background: rgba(255,255,255,0.04); border: 0.5px solid rgba(255,255,255,0.09);
+            transition: background 0.18s, border-color 0.18s, transform 0.18s; position: relative;
+        }
+        .quake-card:hover { background: rgba(255,255,255,0.09); border-color: rgba(255,255,255,0.2); transform: translateY(-1px); }
+        .quake-card.is-new { animation: cardFlash 1.6s ease-out; }
+        @keyframes cardFlash {
+            0% { background: rgba(34,197,94,0.22); border-color: rgba(34,197,94,0.5); }
+            100% { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.09); }
+        }
+        .new-tag {
+            position: absolute; top: 7px; right: 9px; font-size: 8px; font-weight: 600; letter-spacing: 0.08em;
+            color: #86efac; background: rgba(34,197,94,0.18); padding: 2px 5px; border-radius: 4px;
+        }
+
+        .seg-btn { flex: 1; text-align: center; font-size: 11px; padding: 5px 0; border-radius: 6px; color: #9aa4b2; cursor: pointer; transition: background 0.15s, color 0.15s; }
+        .seg-btn.active { background: #fb923c; color: #0a0e14; font-weight: 600; }
+
+        input[type="range"].mag { -webkit-appearance: none; appearance: none; width: 100%; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.14); outline: none; cursor: pointer; }
+        input[type="range"].mag::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,0.5); cursor: pointer; }
+        input[type="range"].mag::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%; border: none; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,0.5); cursor: pointer; }
+
+        .quake-icon { position: relative; }
+        .quake-dot { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); border-radius: 50%; }
+        .quake-ring { position: absolute; top: 50%; left: 50%; border-radius: 50%; border: 2px solid currentColor; transform: translate(-50%,-50%); }
+        .ring-newest { animation: pingExpand 2.4s ease-out infinite; }
+        .ring-major { animation: pulseExpand 2s ease-out infinite; }
+        @keyframes pingExpand { 0% { width: 100%; height: 100%; opacity: 0.9; } 100% { width: 420%; height: 420%; opacity: 0; } }
+        @keyframes pulseExpand { 0% { width: 100%; height: 100%; opacity: 0.8; } 100% { width: 280%; height: 280%; opacity: 0; } }
+
+        @media (prefers-reduced-motion: reduce) {
+            .ring-newest, .ring-major, .quake-card.is-new { animation: none; }
+            #sidebar { transition: none; }
+        }
+
+        #detail-drawer {
+            position: absolute; bottom: 1rem; left: calc(360px + 2rem); width: 240px; border-radius: 14px; padding: 12px; z-index: 500;
+            transform: translateY(16px); opacity: 0; pointer-events: none; transition: transform 0.25s ease, opacity 0.25s ease;
+        }
+        #detail-drawer.open { transform: translateY(0); opacity: 1; pointer-events: auto; }
+        @media (max-width: 768px) { #detail-drawer { left: 1rem; right: 1rem; bottom: auto; top: 1rem; width: auto; } }
+
+        .leaflet-popup-content-wrapper { background: rgba(17,22,31,0.92); color: #f3f4f6; border: 0.5px solid rgba(255,255,255,0.16); border-radius: 12px; backdrop-filter: blur(10px); box-shadow: 0 10px 30px rgba(0,0,0,0.55); }
+        .leaflet-popup-tip { background: rgba(17,22,31,0.92); }
+        .leaflet-container a.leaflet-popup-close-button { color: #9ca3af; padding: 8px 8px 0 0; }
+        .leaflet-container a.leaflet-popup-close-button:hover { color: #fff; background: transparent; }
+        .leaflet-control-zoom a { background: rgba(17,22,31,0.82) !important; color: #cbd5e1 !important; border: 0.5px solid rgba(255,255,255,0.14) !important; backdrop-filter: blur(8px); }
+        .leaflet-control-zoom a:hover { background: rgba(30,40,54,0.92) !important; }
+        .leaflet-control-attribution { background: rgba(7,11,16,0.6) !important; color: #6b7686 !important; backdrop-filter: blur(6px); border-radius: 6px 0 0 0; }
+        .leaflet-control-attribution a { color: #8b95a5 !important; }
     </style>
 </head>
-<body class="bg-gray-900 text-white h-screen flex flex-col md:flex-row overflow-hidden font-sans">
+<body class="bg-[#070b10] text-white overflow-hidden font-sans">
 
-    <!-- Sidebar / Feed -->
-    <aside class="w-full md:w-1/3 lg:w-1/4 bg-gray-900 border-r border-gray-800 flex flex-col h-1/3 md:h-full z-10 shadow-2xl relative">
-        <div class="p-5 pb-4 flex-shrink-0 border-b border-gray-800 bg-gray-900 z-20">
-            <div class="flex justify-between items-start mb-1">
-                <h1 class="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-orange-400 flex items-center gap-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                    </svg>
+    <div id="map"></div>
+    <div class="map-overlay"></div>
+
+    <aside id="sidebar" class="glass">
+        <div id="sidebar-handle"><span></span></div>
+
+        <div class="px-4 pt-4 pb-3 flex-shrink-0" style="border-bottom: 0.5px solid rgba(255,255,255,0.08);">
+            <div class="flex items-center justify-between">
+                <h1 class="flex items-center gap-2 text-lg font-semibold tracking-tight">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="#fb923c"><path d="M13 2 4 14h6l-1 8 9-12h-6z"/></svg>
                     SeismicRadar
                 </h1>
-                
-                <!-- Info Button -->
-                <button id="info-btn" class="text-gray-400 hover:text-white transition-colors" title="About SeismicRadar">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
+                <button id="info-btn" class="text-gray-400 hover:text-white transition-colors" title="About SeismicRadar" aria-label="About SeismicRadar">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                 </button>
             </div>
-            <p class="text-xs text-gray-400 uppercase tracking-wider font-semibold mb-4">Real-time USGS Feed</p>
-            
-            <!-- Filters -->
-            <div class="space-y-3 mb-4">
-                <div>
-                    <label for="mag-filter" class="block text-xs text-gray-500 uppercase tracking-wider mb-1">Min Magnitude</label>
-                    <select id="mag-filter" class="w-full bg-gray-800 text-white text-sm rounded border border-gray-700 p-2 focus:outline-none focus:border-red-500 transition-colors cursor-pointer">
-                        <option value="0">All Earthquakes</option>
-                        <option value="2.5">2.5+ (Felt)</option>
-                        <option value="4.0">4.0+ (Moderate)</option>
-                        <option value="5.0">5.0+ (Significant)</option>
-                        <option value="6.0">6.0+ (Major)</option>
-                    </select>
-                </div>
-                <div>
-                    <label for="search-filter" class="block text-xs text-gray-500 uppercase tracking-wider mb-1">Location Search</label>
-                    <input type="text" id="search-filter" placeholder="e.g. Japan, California..." class="w-full bg-gray-800 text-white text-sm rounded border border-gray-700 p-2 focus:outline-none focus:border-red-500 transition-colors placeholder-gray-500">
-                </div>
-                
-                <!-- Plate Tectonics Toggle -->
-                <div class="flex items-center justify-between pt-2 border-t border-gray-800 mt-3">
-                    <label for="plates-toggle" class="text-xs text-gray-400 uppercase tracking-wider cursor-pointer">Show Tectonic Plates</label>
-                    <label class="relative inline-flex items-center cursor-pointer">
-                        <input type="checkbox" id="plates-toggle" class="sr-only peer" checked>
-                        <div class="w-9 h-5 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-cyan-600"></div>
-                    </label>
-                </div>
-            </div>
-
-            <div class="flex justify-between items-center text-sm text-gray-300">
-                <span>Last 24 Hours</span>
-                <span id="quake-count" class="bg-gray-800 px-2 py-1 rounded text-xs font-mono text-gray-400">Loading...</span>
+            <div class="flex items-center gap-1.5 mt-1.5">
+                <span class="w-1.5 h-1.5 rounded-full bg-green-500 shadow-[0_0_6px_#22c55e]"></span>
+                <span class="text-[11px] uppercase tracking-wider text-gray-400">Live &middot; USGS feed</span>
             </div>
         </div>
 
-        <div id="quake-list" class="flex-1 overflow-y-auto p-3 space-y-2 pb-20 md:pb-3">
-            <div class="animate-pulse flex space-x-4 p-3 bg-gray-800 rounded">
-                <div class="rounded-full bg-gray-700 h-10 w-10"></div>
+        <div class="px-4 py-3 flex-shrink-0" style="border-bottom: 0.5px solid rgba(255,255,255,0.08);">
+            <div class="grid grid-cols-3 gap-2">
+                <div class="glass-inset rounded-lg p-2">
+                    <div class="text-[10px] uppercase tracking-wide text-gray-400">Showing</div>
+                    <div id="stat-total" class="text-lg font-semibold tabular-nums">-</div>
+                </div>
+                <div class="glass-inset rounded-lg p-2">
+                    <div class="text-[10px] uppercase tracking-wide text-gray-400">Largest</div>
+                    <div id="stat-largest" class="text-lg font-semibold tabular-nums">-</div>
+                </div>
+                <div class="glass-inset rounded-lg p-2">
+                    <div class="text-[10px] uppercase tracking-wide text-gray-400">Latest</div>
+                    <div id="stat-latest" class="text-lg font-semibold tabular-nums">-</div>
+                </div>
+            </div>
+            <div id="histogram" class="mt-3" aria-hidden="true"></div>
+            <div class="text-[10px] text-gray-500 text-center mt-1">magnitude distribution</div>
+        </div>
+
+        <div class="px-4 py-3 flex-shrink-0 space-y-3" style="border-bottom: 0.5px solid rgba(255,255,255,0.08);">
+            <div class="glass-inset rounded-lg p-[3px] flex gap-[3px]">
+                <div class="seg-btn" data-range="hour">Hour</div>
+                <div class="seg-btn active" data-range="day">Day</div>
+            </div>
+
+            <div>
+                <div class="flex justify-between text-[10px] uppercase tracking-wide text-gray-400">
+                    <label for="mag-slider">Min magnitude</label>
+                    <span id="mag-value" class="text-orange-400 font-medium tabular-nums">All</span>
+                </div>
+                <input id="mag-slider" type="range" class="mag mt-2" min="0" max="7" step="0.1" value="0">
+            </div>
+
+            <div class="flex items-center gap-2">
+                <div class="flex-1 flex items-center gap-2 glass-inset rounded-lg px-2.5 py-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z"/></svg>
+                    <input id="search-filter" type="text" placeholder="Search location..." class="bg-transparent text-xs w-full focus:outline-none placeholder-gray-500">
+                </div>
+                <select id="sort-select" class="glass-inset rounded-lg text-xs px-2 py-2 focus:outline-none cursor-pointer" style="color:#e5e7eb;">
+                    <option value="time" style="background:#11161f;color:#e5e7eb;">Recent</option>
+                    <option value="mag" style="background:#11161f;color:#e5e7eb;">Magnitude</option>
+                    <option value="distance" style="background:#11161f;color:#e5e7eb;">Nearest</option>
+                </select>
+            </div>
+
+            <div class="flex items-center justify-between pt-1">
+                <label for="plates-toggle" class="text-[11px] uppercase tracking-wider text-gray-400 cursor-pointer">Tectonic plates</label>
+                <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" id="plates-toggle" class="sr-only peer" checked>
+                    <div class="w-9 h-5 bg-gray-600 rounded-full peer peer-checked:bg-cyan-600 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all"></div>
+                </label>
+            </div>
+        </div>
+
+        <div id="quake-list" class="flex-1 overflow-y-auto p-2.5 space-y-2 min-h-0">
+            <div class="animate-pulse flex gap-3 p-3 rounded-lg" style="background: rgba(255,255,255,0.04);">
+                <div class="rounded-full h-10 w-10" style="background: rgba(255,255,255,0.1);"></div>
                 <div class="flex-1 space-y-2 py-1">
-                    <div class="h-3 bg-gray-700 rounded w-3/4"></div>
-                    <div class="h-3 bg-gray-700 rounded w-1/2"></div>
+                    <div class="h-3 rounded w-3/4" style="background: rgba(255,255,255,0.1);"></div>
+                    <div class="h-3 rounded w-1/2" style="background: rgba(255,255,255,0.1);"></div>
                 </div>
             </div>
         </div>
     </aside>
 
-    <!-- Map Container -->
-    <main class="w-full md:w-2/3 lg:w-3/4 h-2/3 md:h-full relative z-0">
-        <div id="map"></div>
-        
-        <!-- Map Legend -->
-        <div class="absolute bottom-6 right-6 bg-gray-900/90 backdrop-blur border border-gray-700 p-3 rounded-lg shadow-xl z-[400] text-xs pointer-events-none">
-            <h4 class="font-bold mb-2 text-gray-300 uppercase tracking-wide">Magnitude</h4>
-            <div class="flex items-center gap-2 mb-1">
-                <span class="w-3 h-3 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.8)]"></span>
-                <span>5.0+ (Significant)</span>
-            </div>
-            <div class="flex items-center gap-2 mb-1">
-                <span class="w-3 h-3 rounded-full bg-orange-500 shadow-[0_0_5px_rgba(249,115,22,0.6)]"></span>
-                <span>3.0 - 4.9 (Moderate)</span>
-            </div>
-            <div class="flex items-center gap-2">
-                <span class="w-3 h-3 rounded-full bg-yellow-400 opacity-70"></span>
-                <span>< 3.0 (Minor)</span>
-            </div>
-        </div>
-    </main>
+    <div id="status-pill" class="glass-sm absolute top-4 right-4 z-[500] flex items-center gap-2 rounded-[10px] px-3 py-1.5 text-[11px] text-gray-300">
+        <span class="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+        <span class="label-full"><span id="status-updated">Loading...</span> &middot; next <span id="status-countdown">-</span></span>
+        <button id="refresh-btn" class="text-gray-200 hover:text-white transition-colors" title="Refresh now" aria-label="Refresh now">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+        </button>
+    </div>
 
-    <!-- Info Modal Overlay -->
+    <div id="legend" class="glass-sm absolute bottom-4 right-4 z-[450] rounded-xl px-3 py-2.5 text-xs pointer-events-none">
+        <h4 class="text-[9px] font-semibold mb-2 text-gray-400 uppercase tracking-wider">Magnitude</h4>
+        <div class="flex items-center gap-2 mb-1.5"><span class="w-2.5 h-2.5 rounded-full bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.8)]"></span><span class="text-gray-200">5.0+ significant</span></div>
+        <div class="flex items-center gap-2 mb-1.5"><span class="w-2.5 h-2.5 rounded-full bg-orange-500"></span><span class="text-gray-200">3.0 - 4.9 moderate</span></div>
+        <div class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-full bg-yellow-400"></span><span class="text-gray-200">&lt; 3.0 minor</span></div>
+    </div>
+
+    <div id="detail-drawer" class="glass">
+        <div class="flex items-center justify-between mb-2">
+            <span id="drawer-mag" class="text-[11px] font-semibold text-red-400">Magnitude -</span>
+            <button id="drawer-close" class="text-gray-400 hover:text-white" aria-label="Close details">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+        </div>
+        <div id="drawer-place" class="text-[11px] text-gray-100 mb-2.5 leading-snug">-</div>
+        <div class="flex gap-1.5 mb-2.5">
+            <div class="glass-inset rounded-md px-2 py-1.5 flex-1"><div class="text-[8px] text-gray-400 uppercase">Depth</div><div id="drawer-depth" class="text-[11px] tabular-nums">-</div></div>
+            <div class="glass-inset rounded-md px-2 py-1.5 flex-1"><div class="text-[8px] text-gray-400 uppercase">Felt</div><div id="drawer-felt" class="text-[11px] tabular-nums">-</div></div>
+            <div class="glass-inset rounded-md px-2 py-1.5 flex-1"><div class="text-[8px] text-gray-400 uppercase">Tsunami</div><div id="drawer-tsunami" class="text-[11px]">-</div></div>
+        </div>
+        <a id="drawer-link" href="#" target="_blank" rel="noopener" class="flex items-center gap-1.5 text-[10px] text-sky-400 hover:text-sky-300 transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+            USGS event details
+        </a>
+    </div>
+
     <div id="info-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-[1000] hidden flex items-center justify-center p-4">
-        <div class="bg-gray-900 border border-gray-700 rounded-xl max-w-lg w-full shadow-2xl overflow-hidden transform scale-95 opacity-0 transition-all duration-200" id="modal-content">
-            <div class="p-5 border-b border-gray-800 flex justify-between items-center bg-gray-800/50">
-                <h2 class="text-xl font-bold text-white flex items-center gap-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
+        <div id="modal-content" class="glass rounded-2xl max-w-lg w-full overflow-hidden transform scale-95 opacity-0 transition-all duration-200">
+            <div class="p-5 flex justify-between items-center" style="border-bottom: 0.5px solid rgba(255,255,255,0.1);">
+                <h2 class="text-xl font-semibold flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-sky-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                     About SeismicRadar
                 </h2>
-                <button id="close-modal-btn" class="text-gray-400 hover:text-white">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
+                <button id="close-modal-btn" class="text-gray-400 hover:text-white" aria-label="Close">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
             </div>
             <div class="p-6 space-y-4 text-sm text-gray-300 leading-relaxed">
-                <p>
-                    <strong>SeismicRadar</strong> is a real-time global dashboard monitoring the earth's tectonic activity. It provides a visual, interactive map of seismic events over the past 24 hours.
-                </p>
-                <div class="bg-gray-800 p-4 rounded-lg border border-gray-700">
-                    <h3 class="font-bold text-white mb-2 uppercase text-xs tracking-wider">📡 Data Source</h3>
-                    <p class="mb-2">
-                        All data is pulled directly and automatically from the <strong>United States Geological Survey (USGS)</strong>. 
-                    </p>
-                    <p class="text-xs text-gray-400">
-                        The dashboard connects to the official USGS GeoJSON live feed, polling for new data every 60 seconds to ensure you are seeing the most accurate, up-to-the-minute reports available.
-                    </p>
+                <p><strong>SeismicRadar</strong> is a real-time global dashboard monitoring the earth's tectonic activity, with an interactive map of recent seismic events.</p>
+                <div class="glass-inset p-4 rounded-lg">
+                    <h3 class="font-semibold text-white mb-2 uppercase text-xs tracking-wider">Data source</h3>
+                    <p class="mb-2">All data is pulled directly from the <strong>United States Geological Survey (USGS)</strong> live GeoJSON feed, refreshed automatically every 60 seconds.</p>
                 </div>
                 <div>
-                    <h3 class="font-bold text-white mb-1 uppercase text-xs tracking-wider">🗺️ How It Works</h3>
+                    <h3 class="font-semibold text-white mb-1 uppercase text-xs tracking-wider">How it works</h3>
                     <ul class="list-disc list-inside space-y-1 text-gray-400">
-                        <li><strong>Click any event</strong> in the sidebar to instantly fly the map to the earthquake's epicenter.</li>
-                        <li><strong>Filter events</strong> by minimum magnitude or search for specific regions (e.g., "California", "Japan").</li>
-                        <li>Circle size and color correspond to the severity (Magnitude) of the earthquake.</li>
+                        <li><strong>Click any event</strong> to fly to its epicenter and open full details.</li>
+                        <li><strong>Filter</strong> by time range, minimum magnitude, or location; sort by recency, magnitude, or distance.</li>
+                        <li>Circle size and color encode magnitude; depth is shown in the detail panel.</li>
                     </ul>
                 </div>
             </div>
-            <div class="p-4 bg-gray-800 border-t border-gray-700 text-center">
-                <a href="https://earthquake.usgs.gov/" target="_blank" class="text-xs text-blue-400 hover:text-blue-300 transition-colors">
-                    Visit Official USGS Website →
-                </a>
+            <div class="p-4 text-center" style="border-top: 0.5px solid rgba(255,255,255,0.1);">
+                <a href="https://earthquake.usgs.gov/" target="_blank" rel="noopener" class="text-xs text-sky-400 hover:text-sky-300 transition-colors">Visit official USGS website -&gt;</a>
             </div>
         </div>
     </div>
 
-    <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-    
-    <!-- Application Logic -->
     <script src="app.js"></script>
 </body>
 </html>

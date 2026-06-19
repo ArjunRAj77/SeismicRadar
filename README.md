@@ -1,56 +1,69 @@
 # SeismicRadar 🌍
 
-**SeismicRadar** is a real-time, global earthquake monitoring dashboard. It visualizes seismic activity across the globe by pulling live data directly from the United States Geological Survey (USGS).
+**SeismicRadar** is a real-time, global earthquake monitoring dashboard. It visualizes seismic activity across the globe by pulling live data directly from the United States Geological Survey (USGS), rendered on an interactive map with a glassmorphism control console.
 
-Designed as a stateless Single Page Application (SPA), it requires zero backend infrastructure, ensuring high reliability and edge-deployment capability.
+Designed as a stateless Single Page Application (SPA), it requires zero backend infrastructure, no build step, and no package manager — ensuring high reliability and edge-deployment capability.
 
 <img width="1913" height="937" alt="image" src="https://github.com/user-attachments/assets/4584c4c2-1417-41bd-a0ae-c5646e9d2c5e" />
 
 ## 🏗️ Architecture & Tech Stack
 
-*   **Architecture:** Stateless SPA
-*   **Data Source 1:** [USGS GeoJSON Feed](https://earthquake.usgs.gov/earthquakes/feed/v1.0/geojson.php) (`all_day.geojson`)
-*   **Data Source 2:** [Fraxen Tectonic Plates](https://github.com/fraxen/tectonicplates) (`PB2002_boundaries.json`)
-*   **Mapping Engine:** Leaflet.js
+*   **Architecture:** Stateless SPA (single `index.html` + `app.js`)
+*   **Earthquake Data:** [USGS GeoJSON Feeds](https://earthquake.usgs.gov/earthquakes/feed/v1.0/geojson.php) — `all_hour.geojson` (Past Hour) and `all_day.geojson` (Past 24 Hours)
+*   **Tectonic Plates:** [Fraxen Tectonic Plates](https://github.com/fraxen/tectonicplates) (`PB2002_boundaries.json`)
+*   **Mapping Engine:** Leaflet.js 1.9.4
 *   **Tile Provider:** CartoDB (Dark Matter theme)
-*   **Styling:** Tailwind CSS (CDN injection for rapid deployment)
+*   **Styling:** Tailwind CSS (CDN) + custom glassmorphism CSS
 *   **Application Logic:** Vanilla ES6 JavaScript
-*   **Hosting:** Vercel Ready (`vercel.json` included for optimal SPA routing and Edge Caching)
+*   **Hosting:** Vercel Ready (`vercel.json` included for SPA routing and edge caching)
 
 ## 🚀 Features
 
-*   **Real-Time Data:** Automatically polls the USGS API every 60 seconds.
-*   **🗺️ Tectonic Plate Overlay:** Visualize geological fault lines using open-source PB2002 GeoJSON data. Toggleable via the UI to show exactly how earthquakes align with the earth's plates.
-*   **🎛️ Real-Time Filtering:** Instantly filter earthquakes by Minimum Magnitude (e.g., 5.0+ Significant) or by Location (e.g., "Japan", "California").
-*   **Interactive Cartography:** Fly-to navigation upon clicking events in the feed.
-*   **Severity Color-Coding:** 
-    *   🔴 **Red:** Magnitude 5.0+ (Significant)
-    *   🟠 **Orange:** Magnitude 3.0 - 4.9 (Moderate)
-    *   🟡 **Yellow:** Magnitude < 3.0 (Minor)
-*   **Responsive Design:** Fully fluid layout that splits into a bottom-sheet feed on mobile and a side-panel feed on desktop. Maps scale dynamically without letterboxing or tiling duplication.
-*   **Time Normalization:** Translates absolute Unix timestamps into human-readable relative time (e.g., "15 minutes ago").
+### Live data
+*   **Auto-refresh:** Polls the active USGS feed every 60 seconds, with a live "updated / next refresh" countdown and a manual refresh button.
+*   **Time range:** Switch between **Past Hour** and **Past 24 Hours** feeds. (See `WEEK_DATA_PLAN.md` for the planned weekly view.)
+*   **NEW event flagging:** Quakes that appear since the last poll briefly flash and carry a `NEW` badge.
+
+### Map & visualization
+*   **🗺️ Tectonic Plate Overlay:** Toggleable PB2002 fault-line overlay (auto-retries if the source is briefly unavailable).
+*   **📡 Radar ping:** The most recent event emits an expanding radar ring; magnitude 5.0+ events pulse continuously.
+*   **Severity color-coding:** 🔴 5.0+ (Significant) · 🟠 3.0–4.9 (Moderate) · 🟡 < 3.0 (Minor). Marker size scales with magnitude.
+*   **Interactive cartography:** Click any feed item or marker to fly to the epicenter.
+
+### Console & filtering
+*   **Glassmorphism UI:** Frosted, blurred panels float over a full-bleed map (sidebar, stats, legend, status pill, detail drawer).
+*   **Live stats + histogram:** Showing count, largest magnitude, latest event, and a magnitude-distribution histogram.
+*   **Filtering:** Minimum-magnitude slider and free-text location search.
+*   **Sorting:** By most recent, magnitude, or **nearest** (optional browser geolocation).
+*   **Detail drawer:** Per-event depth, felt reports, tsunami flag, and a link to the official USGS event page.
+*   **Persisted preferences:** Time range, magnitude, sort, and plate toggle are remembered via `localStorage`.
+
+### Experience
+*   **Responsive design:** Floating side panel on desktop; collapsible bottom sheet on mobile. The map refits to any viewport (via `ResizeObserver`) without letterboxing or tile duplication.
+*   **Accessibility:** Honors `prefers-reduced-motion` (disables pings/pulses/flashes), with ARIA labels on icon-only controls.
+*   **Custom icon:** Original radar-themed SVG favicon.
 
 ## 💻 Installation & Usage
 
-Because the application is entirely stateless and relies on client-side fetching, no build step or package manager is required.
+No build step or package manager is required.
 
 1.  Navigate to the directory:
     ```bash
     cd G:\AI\SeismicRadar
     ```
-2.  Serve the directory using any local HTTP server. For example, using Python:
+2.  Serve the directory using any local HTTP server, e.g.:
     ```bash
     python -m http.server 8000
     ```
-    *(Alternatively, use `npx serve`, Live Server in VSCode, or simply open `index.html` directly in your browser, though an HTTP server is recommended to prevent strict CORS/file protocol restrictions in some browsers).*
-
-3.  Open your browser to `http://localhost:8000`.
+    *(Alternatively `npx serve`, VS Code Live Server, or open `index.html` directly — an HTTP server is recommended to avoid file-protocol CORS restrictions.)*
+3.  Open `http://localhost:8000`.
 
 ## 🛡️ Security & Privacy
 
-*   **No PII Collection:** The application does not track users or store cookies.
-*   **CORS:** The USGS API is publicly accessible and explicitly allows Cross-Origin Resource Sharing. No proxy backend is required.
-*   **Dependency Management:** Leaflet JS/CSS and Tailwind are loaded via secure CDNs with Subresource Integrity (SRI) hashes where applicable.
+*   **No PII collection:** No user tracking and no cookies. The only client-side storage is a single `localStorage` key holding non-personal UI preferences (selected time range, magnitude, sort, plate toggle).
+*   **Geolocation:** Used only if you choose "Nearest" sort; the coordinate stays in memory and is never transmitted or stored.
+*   **CORS:** USGS feeds are publicly accessible and CORS-enabled — no proxy backend required.
+*   **Dependencies:** Leaflet JS/CSS is loaded via CDN with Subresource Integrity (SRI) hashes; Tailwind is loaded via its official CDN.
 
 ---
 *Architected and built for high performance and situational awareness.*
